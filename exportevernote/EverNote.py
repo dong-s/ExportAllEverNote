@@ -113,9 +113,9 @@ class EverNoteCustomClient:
         :param note_guid:
         :return:
         """
-        try:
-            note = self.note_store.getNote(note_guid, True, True, True, True)
+        note = self.note_store.getNote(note_guid, True, True, True, True)
 
+        try:
             result = note_header.format(now, note.title)
             result += note.content[note.content.find("<en-note"):]
             result += "]]>"
