@@ -224,8 +224,6 @@ def main():
     notebooks = client.list_notebooks()
 
     for notebook in notebooks:
-        if notebook.name != "深度学习":
-            continue
         notebook_count += 1
         # 判断当前笔记本是否有上级目录
         logging.info("================================")
@@ -242,8 +240,6 @@ def main():
         notes = client.get_notes_by_notebookid(notebook.guid)
 
         for note in notes:
-            if note.title != "《attention is all you need》解读":
-                continue
             note_count += 1
             logging.info("开始导出笔记《{}》".format(note.title))
             result = client.format_enex_file(note.guid)
