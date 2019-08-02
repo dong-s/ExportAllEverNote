@@ -8,7 +8,7 @@ here = os.path.abspath(os.path.dirname(__file__))
 
 setup(
     name='evernote-export',
-    version='1.0.0',
+    version='1.0.1',
     description='批量导出Evernote中的所有笔记，按照笔记目录，存档到本地对应文件夹',
     long_description=open(os.path.join(here, 'README.md'), encoding='utf-8').read(),
     long_description_content_type='text/markdown',
