@@ -14,14 +14,11 @@ logging.basicConfig(level=logging.INFO, format="<%(asctime)s> [%(levelname)s] %(
 
 note_header = """<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE en-export SYSTEM "http://xml.evernote.com/pub/evernote-export3.dtd">
-<en-export export-date="{}" application="Evernote" version="Evernote Mac 7.2.1 (456793)">
-<note><title>{}</title><content><![CDATA[<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE en-note SYSTEM "http://xml.evernote.com/pub/enml2.dtd">"""
+<en-export export-date="{}" application="Evernote" version="Evernote Mac 9.1.0 (458321)">
+<note><title>{}</title><content><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE en-note SYSTEM "http://xml.evernote.com/pub/enml2.dtd">{}]]>"""
 
-note_mid = """</content><created>{}</created><updated>{}</updated><note-attributes><source>{}</source><source-url>{}</source-url><source-application>{}</source-application><reminder-order>0</reminder-order></note-attributes>"""
-
-note_resource_one = """<resource><data encoding="base64">{}</data><mime>{}</mime><width>{}</width><height>{}</height><duration>0</duration><recognition><![CDATA[{}]]></recognition><resource-attributes><source-url>{}</source-url><timestamp>19700101T000000Z</timestamp><reco-type>unknown</reco-type><file-name>{}</file-name></resource-attributes></resource>"""
-
-note_resource_two = """<resource><data encoding="base64">{}</data><mime>{}</mime><width>{}</width><height>{}</height><duration>0</duration><resource-attributes><source-url>{}</source-url><timestamp>19700101T000000Z</timestamp><file-name>{}</file-name></resource-attributes></resource>"""
+note_mid = """</content><created>{}</created><updated>{}</updated><note-attributes>{}</note-attributes>"""
 
 note_tail = """</note></en-export>"""
 
@@ -107,6 +104,74 @@ class EverNoteCustomClient:
         """
         return self.note_store.getNote(note_guid, True, True, True, True)
 
+    def get_note_attributes(self, attribute):
+        res = ""
+        if attribute.subjectDate:
+            res += "<subject-date>{}</subject-date>".format(attribute.subjectDate)
+        if attribute.latitude:
+            res += "<latitude>{}</latitude>".format(attribute.latitude)
+        if attribute.longitude:
+            res += "<longitude>{}</longitude>".format(attribute.longitude)
+        if attribute.altitude:
+            res += "<altitude>{}</altitude>".format(attribute.altitude)
+        if attribute.author:
+            res += "<author>{}</author>".format(attribute.author)
+        if attribute.source:
+            res += "<source>{}</source>".format(attribute.source)
+        if attribute.sourceURL:
+            res += "<source-url>{}</source-url>".format(attribute.sourceURL.replace("&", "&amp;"))
+        if attribute.sourceApplication:
+            res += "<source-application>{}</source-application>".format(attribute.sourceApplication)
+        if attribute.shareDate:
+            res += "<share-date>{}</share-date>".format(attribute.shareDate)
+        if attribute.reminderOrder:
+            res += "<reminder-order>{}</reminder-order>".format(attribute.reminderOrder)
+        if attribute.reminderTime:
+            res += "<reminder-time>{}</reminder-time>".format(attribute.reminderTime)
+        if attribute.placeName:
+            res += "<place-name>{}</place-name>".format(attribute.placeName)
+        if attribute.contentClass:
+            res += "<content-class>{}</content-class>".format(attribute.contentClass)
+        if attribute.classifications:
+            res += "<classifications>{}</classifications>".format(attribute.classifications)
+        if attribute.creatorId:
+            res += "<creator-id>{}</creator-id>".format(attribute.creatorId)
+        return res
+
+    def get_note_resource_attributes(self, attribute):
+        res = "<timestamp>19700101T000000Z</timestamp>"
+        if attribute.sourceURL:
+            res += "<source-url>{}</source-url>".format(attribute.sourceURL.replace("&", "&amp;"))
+        if attribute.recoType:
+            res += "<reco-type>{}</reco-type>".format(attribute.recoType)
+        else:
+            res += "<reco-type>unknown</reco-type>"
+        if attribute.fileName:
+            res += "<file-name>{}</file-name>".format(attribute.fileName)
+        return res
+
+    def get_note_resource(self, resource):
+        res = ""
+        if resource.data.body:
+            res += "<data encoding=\"base64\">{}</data>".format(
+                format_str(base64.b64encode(resource.data.body), 80))
+        if resource.mime:
+            res += "<mime>{}</mime>".format(resource.mime)
+        if resource.width:
+            res += "<width>{}</width>".format(resource.width)
+        if resource.height:
+            res += "<height>{}</height>".format(resource.height)
+        if resource.duration:
+            res += "<duration>{}</duration>".format(resource.duration)
+        else:
+            res += "<duration>0</duration>"
+        if resource.recognition:
+            res += "<recognition><![CDATA[{}]]></recognition>".format(resource.recognition)
+        if resource.attributes:
+            res += "<resource-attributes>{}</resource-attributes>".format(
+                self.get_note_resource_attributes(resource.attributes))
+        return "<resource>{}</resource>".format(res)
+
     def format_enex_file(self, note_guid):
         """
         组装enex文件
@@ -116,34 +181,14 @@ class EverNoteCustomClient:
         note = self.note_store.getNote(note_guid, True, True, True, True)
 
         try:
-            result = note_header.format(now, note.title)
-            result += note.content[note.content.find("<en-note"):]
-            result += "]]>"
-            if note.attributes.sourceURL:
-                note_source_url = note.attributes.sourceURL.replace("&", "&amp;")
-            else:
-                note_source_url = ""
+            result = note_header.format(now, note.title, note.content[note.content.find("<en-note"):])
+            result += note_mid.format(format_time(note.created), format_time(note.updated),
+                                      self.get_note_attributes(note.attributes))
 
-            result += note_mid.format(format_time(note.created), format_time(note.updated), note.attributes.source,
-                                      note_source_url, note.attributes.sourceApplication)
             if note.resources:
-                res_list = note.resources
-                for res in res_list:
-                    if res.attributes.sourceURL:
-                        resources_source_url = res.attributes.sourceURL.replace("&", "&amp;")
-                    else:
-                        resources_source_url = ""
+                for resource in note.resources:
+                    result += self.get_note_resource(resource)
 
-                    if res.recognition:
-                        result += note_resource_one.format(format_str(base64.b64encode(res.data.body), 80), res.mime,
-                                                           res.width, res.height, res.recognition.body,
-                                                           resources_source_url,
-                                                           res.attributes.fileName)
-                    else:
-                        result += note_resource_two.format(format_str(base64.b64encode(res.data.body), 80), res.mime,
-                                                           res.width, res.height,
-                                                           resources_source_url,
-                                                           res.attributes.fileName)
             result += note_tail
             return result
         except Exception as e:
@@ -179,6 +224,8 @@ def main():
     notebooks = client.list_notebooks()
 
     for notebook in notebooks:
+        if notebook.name != "深度学习":
+            continue
         notebook_count += 1
         # 判断当前笔记本是否有上级目录
         logging.info("================================")
@@ -195,6 +242,8 @@ def main():
         notes = client.get_notes_by_notebookid(notebook.guid)
 
         for note in notes:
+            if note.title != "《attention is all you need》解读":
+                continue
             note_count += 1
             logging.info("开始导出笔记《{}》".format(note.title))
             result = client.format_enex_file(note.guid)
