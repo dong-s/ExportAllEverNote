@@ -55,11 +55,11 @@ def write_file(path, content):
     :param path:
     :param content:
     :return:
-    """    
+    """
     with open(path + ".enex", 'w') as f:
         f.write(content)
 
- 
+
 def format_str(text, length):
     """
     按指定长度切分文本
@@ -184,17 +184,16 @@ class EverNoteCustomClient:
         note = self.note_store.getNote(note_guid, True, True, True, True)        
 
         try:
-            content = note.content[note.content.find("<en-note>"):]
+            content = note.content[note.content.find("<en-note"):]
 
             details = []
             if note.tagGuids:
-                details.append('Tags:[[' + "]] [[".join([self._tags[i] for i in note.tagGuids]) + ']]')
+                details.append('Tags:' + ','.join(['[[' + self._tags[i] + ']]' for i in note.tagGuids]))
             
             if note.attributes.sourceURL is not None:
                 details.append('Source:' + note.attributes.sourceURL)
 
-            content = '<en-note><pre>' + "\n".join(details) + '</pre>' + content[9:]
-            # print(content)
+            content = content.replace("</en-note>", "<div>" + "<br/>".join(details) + "</div></en-note>")
 
             result = note_header.format(now, note.title, content)
             result += note_mid.format(format_time(note.created), format_time(note.updated),
@@ -236,7 +235,7 @@ def main():
 
     client = EverNoteCustomClient(token=token, sandbox=sandbox, china=china)
 
-    notebooks = client.list_notebooks()
+    notebooks = client.list_notebooks()    
 
     for notebook in notebooks:
         notebook_count += 1
@@ -253,9 +252,8 @@ def main():
         logging.info("创建notebook对应的目录：{}".format(note_path))
 
         for i in range(10):
-            notes = client.get_notes_by_notebookid(notebook.guid, i*50, i*50+50)
-                    
-            # print(notebook.name, len(notes))
+            notes = client.get_notes_by_notebookid(notebook.guid, i*50, i*50+50)            
+                
             if len(notes) <= 0:
                 break
 
@@ -264,7 +262,7 @@ def main():
                 logging.info("开始导出笔记《{}》".format(note.title))
                 result = client.format_enex_file(note.guid)
                 if result:
-                    write_file(os.path.join(note_path, re.sub(r'[/\\\s<>]', '_', note.title)), result)
+                    write_file(os.path.join(note_path, re.sub(r'[/\\\s<>]', '_', note.title[:100])), result)
                 # exit()
 
             logging.info("当前notebook《{}》已导出完成！".format(notebook.name))
