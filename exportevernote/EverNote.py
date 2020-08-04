@@ -9,7 +9,6 @@ from datetime import datetime
 from optparse import OptionParser
 from evernote.edam.notestore import NoteStore
 from evernote.api.client import EvernoteClient
-from pprint import pprint
 
 
 logging.basicConfig(level=logging.INFO, format="<%(asctime)s> [%(levelname)s] %(message)s")
@@ -56,14 +55,11 @@ def write_file(path, content):
     :param path:
     :param content:
     :return:
-    """
-    try:
-        with open(path + ".enex", 'w') as f:
-            f.write(content)
-    except:
-        pass
+    """    
+    with open(path + ".enex", 'w') as f:
+        f.write(content)
 
-
+ 
 def format_str(text, length):
     """
     按指定长度切分文本
