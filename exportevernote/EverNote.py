@@ -9,6 +9,8 @@ from datetime import datetime
 from optparse import OptionParser
 from evernote.edam.notestore import NoteStore
 from evernote.api.client import EvernoteClient
+from pprint import pprint
+
 
 logging.basicConfig(level=logging.INFO, format="<%(asctime)s> [%(levelname)s] %(message)s")
 
@@ -55,8 +57,11 @@ def write_file(path, content):
     :param content:
     :return:
     """
-    with open(path + ".enex", 'w') as f:
-        f.write(content)
+    try:
+        with open(path + ".enex", 'w') as f:
+            f.write(content)
+    except:
+        pass
 
 
 def format_str(text, length):
@@ -80,13 +85,15 @@ class EverNoteCustomClient:
     def __init__(self, token, sandbox, china):
         logging.info("初始化EverNote客户端！")
         self.client = EvernoteClient(token=token, sandbox=sandbox, china=china)
-        self.note_store = self.client.get_note_store()
+        self.note_store = self.client.get_note_store()        
+
+        self._tags = {i.guid:i.name for i in self.note_store.listTags()}
 
     def list_notebooks(self):
-        logging.info("获取所有笔记本！")
+        logging.info("获取所有笔记本！")        
         return self.note_store.listNotebooks()
 
-    def get_notes_by_notebookid(self, notebook_guid):
+    def get_notes_by_notebookid(self, notebook_guid, start, end):
         """
         获取当前笔记本下的所有笔记
         :param notebook_guid:
@@ -94,7 +101,7 @@ class EverNoteCustomClient:
         """
         note_filter = NoteStore.NoteFilter()
         note_filter.notebookGuid = notebook_guid
-        return self.note_store.findNotes(note_filter, 0, 999).notes
+        return self.note_store.findNotes(note_filter, start, end).notes
 
     def get_note(self, note_guid):
         """
@@ -178,10 +185,22 @@ class EverNoteCustomClient:
         :param note_guid:
         :return:
         """
-        note = self.note_store.getNote(note_guid, True, True, True, True)
+        note = self.note_store.getNote(note_guid, True, True, True, True)        
 
         try:
-            result = note_header.format(now, note.title, note.content[note.content.find("<en-note"):])
+            content = note.content[note.content.find("<en-note>"):]
+
+            details = []
+            if note.tagGuids:
+                details.append('Tags:[[' + "]] [[".join([self._tags[i] for i in note.tagGuids]) + ']]')
+            
+            if note.attributes.sourceURL is not None:
+                details.append('Source:' + note.attributes.sourceURL)
+
+            content = '<en-note><pre>' + "\n".join(details) + '</pre>' + content[9:]
+            # print(content)
+
+            result = note_header.format(now, note.title, content)
             result += note_mid.format(format_time(note.created), format_time(note.updated),
                                       self.get_note_attributes(note.attributes))
 
@@ -237,16 +256,22 @@ def main():
             create_dir(note_path)
         logging.info("创建notebook对应的目录：{}".format(note_path))
 
-        notes = client.get_notes_by_notebookid(notebook.guid)
+        for i in range(10):
+            notes = client.get_notes_by_notebookid(notebook.guid, i*50, i*50+50)
+                    
+            # print(notebook.name, len(notes))
+            if len(notes) <= 0:
+                break
 
-        for note in notes:
-            note_count += 1
-            logging.info("开始导出笔记《{}》".format(note.title))
-            result = client.format_enex_file(note.guid)
-            if result:
-                write_file(os.path.join(note_path, re.sub(r'[/\\\s<>]', '_', note.title)), result)
+            for note in notes:
+                note_count += 1
+                logging.info("开始导出笔记《{}》".format(note.title))
+                result = client.format_enex_file(note.guid)
+                if result:
+                    write_file(os.path.join(note_path, re.sub(r'[/\\\s<>]', '_', note.title)), result)
+                # exit()
 
-        logging.info("当前notebook《{}》已导出完成！".format(notebook.name))
+            logging.info("当前notebook《{}》已导出完成！".format(notebook.name))
 
     logging.info("全部笔记已导出，共导出笔记本：{}，共导出笔记：{}".format(notebook_count, note_count))
 
